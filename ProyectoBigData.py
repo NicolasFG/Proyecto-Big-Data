@@ -317,6 +317,15 @@ def entrenamiento2(df_clientes_activos_y_productos_populares, user_id_map, item_
     with open('ultimos_resultados/codigo_a_descripcion_mes.pkl', 'wb') as file:
         pickle.dump(codigo_a_descripcion2, file)
 
+
+def convertir_mes_a_numero(mes_nombre):
+    meses = {
+        "Enero": 1, "Febrero": 2, "Marzo": 3, "Abril": 4, "Mayo": 5, "Junio": 6,
+        "Julio": 7, "Agosto": 8, "Septiembre": 9, "Octubre": 10, "Noviembre": 11, "Diciembre": 12
+    }
+    return meses.get(mes_nombre.capitalize(), 0)  
+
+
 def testing_meses(mes_input, user_id_prueba, df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre_file, item_index_to_codigosap_mes_file, codigo_a_descripcion_file, productos_por_mes):
 
     # Cargar el modelo entrenado
@@ -345,12 +354,17 @@ def testing_meses(mes_input, user_id_prueba, df, model_file, user_id_map_file, i
     print("mes_input:", mes_input)
 
     
-    # Filtrar los productos populares para el mes dado
-    productos_populares_mes_actual = productos_por_mes[productos_por_mes['mes'] == mes_input]
+    mes_numero = convertir_mes_a_numero(mes_input)
 
+    # Filtrar los productos populares para el mes dado
+    #productos_populares_mes_actual = productos_por_mes[productos_por_mes['mes'] == mes_input]
+    
+    productos_populares_mes_actual = productos_por_mes[productos_por_mes['mes'] == mes_numero]
 
     # Obtener solo los codigosap de los productos populares en ese mes
     codigosap_populares_mes = set(productos_populares_mes_actual['codigosap'])
+
+    
 
     df['user_index'] = df['CodCliente'].map(user_id_map)
     df['item_index'] = df['codigosap'].map(item_id_map)
@@ -377,7 +391,11 @@ def testing_meses(mes_input, user_id_prueba, df, model_file, user_id_map_file, i
     # Procesar recomendaciones como antes
     if user_id_prueba in user_id_map:
         user_index = user_id_map[user_id_prueba]
-        recommended = loaded_model.recommend(user_index, user_item_matrix_csr[user_index], N=10)
+
+        indices_productos_populares = [item_id_map[codigosap] for codigosap in codigosap_populares_mes if codigosap in item_id_map]
+        user_item_matrix_filtrada = user_item_matrix_csr[user_index, indices_productos_populares]
+
+        recommended = loaded_model.recommend(user_index, user_item_matrix_filtrada, N=10)
         
         indices_recomendados, puntuaciones = recommended
         print(f"Recomendaciones para el usuario {user_id_prueba} en el mes {mes_input}:")
