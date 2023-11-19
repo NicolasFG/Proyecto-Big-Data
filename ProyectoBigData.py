@@ -28,15 +28,16 @@ def preprocesamiento():
     clientes_activos = interacciones_por_cliente[interacciones_por_cliente >= min_interacciones].index
     df_clientes_activos = df[df['CodCliente'].isin(clientes_activos)]
 
-    # Crear un DataFrame con el conteo de pedidos por producto para clientes activos
-    pedidos_producto = df_clientes_activos.groupby('codigosap').size()
+    """     # Crear un DataFrame con el conteo de pedidos por producto para clientes activos
+        pedidos_producto = df_clientes_activos.groupby('codigosap').size()
 
-    # Calcular el promedio de pedidos por producto
-    promedio_pedidos = pedidos_producto.mean()
+        # Calcular el promedio de pedidos por producto
+        promedio_pedidos = pedidos_producto.mean()
 
-    # Filtrar para mantener solo los productos populares
-    min_pedidos = promedio_pedidos
-    productos_populares = pedidos_producto[pedidos_producto >= min_pedidos].index
+        # Filtrar para mantener solo los productos populares
+        min_pedidos = promedio_pedidos
+        productos_populares = pedidos_producto[pedidos_producto >= min_pedidos].index 
+    """
     df_clientes_activos_y_productos_populares = df_clientes_activos
 
     # Calcular la preferencia de subcategoría
