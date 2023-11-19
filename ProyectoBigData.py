@@ -8,13 +8,16 @@ from scipy.sparse import coo_matrix
 import pandas as pdh
 import pandas as pd
 
+import pandas as pd
+import os
+
+import pandas as pd
+import os
+
 def preprocesamiento():
     # Obtener la ruta del directorio actual y cargar el DataFrame
     ruta_actual = os.getcwd()
-    df = pd.read_csv(ruta_actual + '/recos_supermercados/supermercados.csv')
-
-    # Filtro los clientes que tienen un codigo de clientes igual a 0, porque no son clientes reales.
-    df = df[df['CodCliente'] != 0]
+    df = pd.read_csv(ruta_actual + '/recos_supermercados/cleaned_data.csv')
 
     # Calcular el promedio de interacciones por cliente
     interacciones_por_cliente = df.groupby('CodCliente').size()
@@ -34,26 +37,34 @@ def preprocesamiento():
     # Filtrar para mantener solo los productos populares
     min_pedidos = promedio_pedidos
     productos_populares = pedidos_producto[pedidos_producto >= min_pedidos].index
-    df_clientes_activos_y_productos_populares = df_clientes_activos[df_clientes_activos['codigosap'].isin(productos_populares)]
+    df_clientes_activos_y_productos_populares = df_clientes_activos
 
-    print(df_clientes_activos_y_productos_populares)
+    # Calcular la preferencia de subcategoría
+    conteo_subcategoria = df_clientes_activos_y_productos_populares.groupby(['CodCliente', 'Subcategoria']).size().reset_index(name='Conteo')
+    conteo_maximo = conteo_subcategoria.groupby('CodCliente')['Conteo'].transform('max')
+    conteo_subcategoria['PreferenciaSubcategoria'] = conteo_subcategoria['Conteo'] / conteo_maximo
 
+    # Unir con el DataFrame principal
+    df_clientes_activos_y_productos_populares = pd.merge(df_clientes_activos_y_productos_populares, conteo_subcategoria[['CodCliente', 'Subcategoria', 'PreferenciaSubcategoria']], on=['CodCliente', 'Subcategoria'], how='left')
 
-    df_clientes_activos_y_productos_populares['rating_implicito'] = df_clientes_activos_y_productos_populares.groupby(['CodCliente', 'codigosap'])['Cantidad'].transform('sum')
+    # Asumiendo que tienes una columna 'PrecioUnitario' en tu DataFrame
+    # Normaliza 'PrecioUnitario' (puedes ajustar este paso según tus datos)
+    df_clientes_activos_y_productos_populares['PrecioUnitarioNormalized'] = (df_clientes_activos_y_productos_populares['PrecioUnitario'] - df_clientes_activos_y_productos_populares['PrecioUnitario'].min()) / (df_clientes_activos_y_productos_populares['PrecioUnitario'].max() - df_clientes_activos_y_productos_populares['PrecioUnitario'].min())
+
+    # Calcular un rating ponderado
+    df_clientes_activos_y_productos_populares['rating_implicito'] = df_clientes_activos_y_productos_populares['Cantidad'] * df_clientes_activos_y_productos_populares['PrecioUnitarioNormalized'] * df_clientes_activos_y_productos_populares['PreferenciaSubcategoria']
 
     # Crear un mapeo de CodCliente a NombreCliente
     cliente_a_nombre = df_clientes_activos_y_productos_populares.set_index('CodCliente')['NombreCliente'].drop_duplicates().to_dict()
-    
-    print(df_clientes_activos_y_productos_populares)
 
     # Crear un mapeo de codigosap a descripcion
-    codigo_a_descripcion = df_clientes_activos_y_productos_populares.set_index('codigosap')['Subcategoria'].to_dict()
+    codigo_a_descripcion = df_clientes_activos_y_productos_populares.set_index('codigosap')['Concatenated'].to_dict()
 
     # Crear mapeos de IDs a índices
     user_id_map = {user_id: index for index, user_id in enumerate(df_clientes_activos_y_productos_populares['CodCliente'].unique())}
     item_id_map = {item_id: index for index, item_id in enumerate(df_clientes_activos_y_productos_populares['codigosap'].unique())}
 
-    print("Pasando a la verificacion de los mapeos")
+    print("Pasando a la verificación de los mapeos")
     # Verificar la longitud de los mapeos
     if len(user_id_map) != df_clientes_activos_y_productos_populares['CodCliente'].nunique():
         print("Hay una discrepancia en los mapeos de user_id_map.")
@@ -69,11 +80,13 @@ def preprocesamiento():
     # Crear un mapeo de item a codigo sap
     item_index_to_codigosap = {index: codigosap for codigosap, index in item_id_map.items()}
 
-    # Dividir en conjuntos de entrenamiento y prueba
+    # Dividir en conjuntos de entrenamiento y prueba - Esto depende de cómo planees hacerlo
     #df_train, df_test = train_test_split(df_clientes_activos_y_productos_populares, test_size=0.2, random_state=42)
 
     return df_clientes_activos_y_productos_populares, user_id_map, item_id_map, cliente_a_nombre, item_index_to_codigosap, codigo_a_descripcion
-   
+
+
+ 
 
 def entrenamiento(df_clientes_activos_y_productos_populares, user_id_map, item_id_map):
     # Número total de usuarios e ítems
@@ -228,7 +241,7 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
 
 df, user_id_map, item_id_map, cliente_a_nombre, item_index_to_codigosap, codigo_a_descripcion = preprocesamiento()
 
-""" entrenamiento(df,user_id_map,item_id_map) """
+entrenamiento(df,user_id_map,item_id_map)
 
 ruta_actual = os.getcwd()
 
@@ -287,7 +300,7 @@ def preprocesamiento_por_meses():
     cliente_a_nombre = df_clientes_activos_y_productos_populares.set_index('CodCliente')['NombreCliente'].drop_duplicates().to_dict()
     
     # Crear un mapeo de codigosap a descripcion
-    codigo_a_descripcion = df_clientes_activos_y_productos_populares.set_index('codigosap')['Subcategoria'].to_dict()
+    codigo_a_descripcion = df_clientes_activos_y_productos_populares.set_index('codigosap')['Concatenated'].to_dict()
 
     # Crear mapeos de IDs a índices
     user_id_map = {user_id: index for index, user_id in enumerate(df_clientes_activos_y_productos_populares['CodCliente'].unique())}
