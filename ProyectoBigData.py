@@ -7,6 +7,8 @@ from scipy.sparse import coo_matrix
 import pandas as pdh
 import pandas as pd
 
+#Primer: Preprocesamiento y entrenamiento de la data para recomendacion general
+
 def preprocesamiento():
     # Obtener la ruta del directorio actual y cargar el DataFrame
     ruta_actual = os.getcwd()
@@ -80,8 +82,6 @@ def preprocesamiento():
     return df_clientes_activos_y_productos_populares, user_id_map, item_id_map, cliente_a_nombre, item_index_to_codigosap, codigo_a_descripcion
 
 
- 
-
 def entrenamiento(df_clientes_activos_y_productos_populares, user_id_map, item_id_map):
     # Número total de usuarios e ítems
 
@@ -127,80 +127,6 @@ def entrenamiento(df_clientes_activos_y_productos_populares, user_id_map, item_i
     # Guardar codigo_a_descripcion
     with open('ultimos_resultados/codigo_a_descripcion.pkl', 'wb') as file:
         pickle.dump(codigo_a_descripcion, file)
-
-
-def entrenamiento2(df_clientes_activos_y_productos_populares, user_id_map, item_id_map):
-    # Número total de usuarios e ítems
-
-    # Convertir los IDs a índices
-    df_clientes_activos_y_productos_populares['user_index'] = df_clientes_activos_y_productos_populares['CodCliente'].map(user_id_map)
-    df_clientes_activos_y_productos_populares['item_index'] = df_clientes_activos_y_productos_populares['codigosap'].map(item_id_map)
-
-    n_users = len(user_id_map)
-    n_items = len(item_id_map)
-
-    # Crear la matriz de interacciones usuario-item como COO
-    user_item_matrix = coo_matrix(
-        (df_clientes_activos_y_productos_populares['rating_implicito'], 
-        (df_clientes_activos_y_productos_populares['user_index'], df_clientes_activos_y_productos_populares['item_index'])),
-        shape=(n_users, n_items)
-    )
-
-    # Convertir a CSR para el entrenamiento
-    user_item_matrix_csr = user_item_matrix.tocsr()
-
-    # Entrenar el modelo ALS
-    model = AlternatingLeastSquares(factors=100, use_gpu=False)
-    model.fit(user_item_matrix_csr * 70)  # Multiplicar por un factor de confianza si es necesario
-
-    # Guardar el modelo entrenado
-    with open('ultimos_resultados/als_model_mejorado_mes.pkl', 'wb') as file:
-        pickle.dump(model, file)
-
-    # Guardar user_id_map y item_id_map
-    with open('ultimos_resultados/user_id_map_mes.pkl', 'wb') as file:
-        pickle.dump(user_id_map, file)
-    with open('ultimos_resultados/item_id_map_mes.pkl', 'wb') as file:
-        pickle.dump(item_id_map, file)
-
-    # Guardar cliente_a_nombre
-    with open('ultimos_resultados/cliente_a_nombre_mes.pkl', 'wb') as file:
-        pickle.dump(cliente_a_nombre2, file)
-
-    # Guardar item_index_to_codigosap
-    with open('ultimos_resultados/item_index_to_codigosap_mes.pkl', 'wb') as file:
-        pickle.dump(item_index_to_codigosap2, file)
-
-    # Guardar codigo_a_descripcion
-    with open('ultimos_resultados/codigo_a_descripcion_mes.pkl', 'wb') as file:
-        pickle.dump(codigo_a_descripcion2, file)
-
-
-
-def validation(df):
-    user_id_prueba_list = df['CodCliente'].drop_duplicates().head(2)
-
-    user_id_1 = 647917
-    #user_id_2 = 3321832
-
-    # Filtrar el DataFrame para obtener solo los registros con los user_id especificados
-    filtered_df = df.loc[df['CodCliente'].isin([user_id_1])]
-
-    # Agrupar por características del producto y calcular el rating promedio
-    grouped = filtered_df.groupby(['CodCliente', 'NombreCliente', 'Subcategoria', 'codigosap'])['rating_implicito'].mean().reset_index()
-
-    # Ordenar por rating promedio y seleccionar los 10 mejores
-    top_rated = grouped.nlargest(10, 'rating_implicito')
-
-
-    #top_rated = filtered_df.nlargest(10, 'rating_implicito')
-
-
-    # Seleccionar solamente las columnas especificadas
-    columns_to_select = ['CodCliente', 'NombreCliente','Subcategoria','codigosap','rating_implicito']
-    top_rated_selected_columns = top_rated[columns_to_select]
-
-    print(top_rated_selected_columns)
 
 
 def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre_file, item_index_to_codigosap_file, codigo_a_descripcion_file):
@@ -261,28 +187,9 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
     else:
         print(f"user_id {user_id_prueba} no encontrado en user_id_map.")
         
-"""
-    for user_id_prueba in user_id_prueba_list:
-        if user_id_prueba in user_id_map:
-            user_index = user_id_map[user_id_prueba]
-            recommended = loaded_model.recommend(user_index, user_item_matrix_csr[user_index], N=5)
 
-            indices_recomendados, puntuaciones = recommended
-            print(f"Recomendaciones para el usuario {user_id_prueba} ({cliente_a_nombre.get(user_id_prueba, 'Nombre no disponible')}):")
-            
-            for item_idx, score in zip(indices_recomendados, puntuaciones):
-                if item_idx in item_index_to_codigosap:
-                    codigosap = item_index_to_codigosap[item_idx]
-                    descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
-                    print(f"Producto Recomendado: ID {codigosap}, Score: {score}, Descripción: {descripcion}")
-                else:
-                    print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.")
-        else:
-            print(f"user_id {user_id_prueba} no encontrado en user_id_map.")
-    """
 
-import os
-import pandas as pd
+#Segundo: Preprocesamiento y entrenamiento de la data para recomendacion de los productos en sus meses respectivos
 
 def preprocesamiento_por_meses():
     # Obtener la ruta del directorio actual y cargar el DataFrame
@@ -351,14 +258,66 @@ def preprocesamiento_por_meses():
     if len(set(item_id_map.values())) != len(item_id_map.values()):
         print("Hay índices duplicados en item_id_map.")
 
-    # Crear un mapeo de item a codigo sap y mes
-    item_index_to_codigosap_mes = {index: (codigosap, mes) for index, (codigosap, mes) in enumerate(productos_populares_por_mes[['codigosap', 'mes']].values)}
+    # Crear un mapeo de índice de ítem a (codigosap, mes)
+    item_index_to_codigosap_mes = {index: (row['codigosap'], row['mes']) for index, row in productos_populares_por_mes.iterrows()}
+    
 
     return df_clientes_activos_y_productos_populares, user_id_map, item_id_map, cliente_a_nombre, item_index_to_codigosap_mes, codigo_a_descripcion, productos_populares_por_mes
 
+def entrenamiento2(df_clientes_activos_y_productos_populares, user_id_map, item_id_map, productos_populares_por_mes):
+    # Número total de usuarios e ítems
 
+    # Convertir los IDs a índices
+    df_clientes_activos_y_productos_populares['user_index'] = df_clientes_activos_y_productos_populares['CodCliente'].map(user_id_map)
+    df_clientes_activos_y_productos_populares['item_index'] = df_clientes_activos_y_productos_populares['codigosap'].map(item_id_map)
 
-def testing_meses(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre_file, item_index_to_codigosap_file, codigo_a_descripcion_file,productos_por_mes):
+    n_users = len(user_id_map)
+    n_items = len(item_id_map)
+
+    # Crear la matriz de interacciones usuario-item como COO
+    user_item_matrix = coo_matrix(
+        (df_clientes_activos_y_productos_populares['rating_implicito'], 
+        (df_clientes_activos_y_productos_populares['user_index'], df_clientes_activos_y_productos_populares['item_index'])),
+        shape=(n_users, n_items)
+    )
+
+    # Convertir a CSR para el entrenamiento
+    user_item_matrix_csr = user_item_matrix.tocsr()
+
+    # Entrenar el modelo ALS
+    model = AlternatingLeastSquares(factors=100, use_gpu=False)
+    model.fit(user_item_matrix_csr * 70)  # Multiplicar por un factor de confianza si es necesario
+
+    # Crear el mapeo de índice de ítem a (codigosap, mes)
+    item_index_to_codigosap_mes = {index: (row['codigosap'], row['mes']) for index, row in productos_populares_por_mes.iterrows()}
+
+    # Guardar el mapeo de índice de ítem a (codigosap, mes)
+    with open('ultimos_resultados/item_index_to_codigosap_mes.pkl', 'wb') as file:
+        pickle.dump(item_index_to_codigosap_mes, file)
+
+    # Guardar el modelo entrenado
+    with open('ultimos_resultados/als_model_mejorado_mes.pkl', 'wb') as file:
+        pickle.dump(model, file)
+
+    # Guardar user_id_map y item_id_map
+    with open('ultimos_resultados/user_id_map_mes.pkl', 'wb') as file:
+        pickle.dump(user_id_map, file)
+    with open('ultimos_resultados/item_id_map_mes.pkl', 'wb') as file:
+        pickle.dump(item_id_map, file)
+
+    # Guardar cliente_a_nombre
+    with open('ultimos_resultados/cliente_a_nombre_mes.pkl', 'wb') as file:
+        pickle.dump(cliente_a_nombre2, file)
+
+    # Guardar item_index_to_codigosap
+    with open('ultimos_resultados/item_index_to_codigosap_mes.pkl', 'wb') as file:
+        pickle.dump(item_index_to_codigosap2, file)
+
+    # Guardar codigo_a_descripcion
+    with open('ultimos_resultados/codigo_a_descripcion_mes.pkl', 'wb') as file:
+        pickle.dump(codigo_a_descripcion2, file)
+
+def testing_meses(mes_input, user_id_prueba, df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre_file, item_index_to_codigosap_mes_file, codigo_a_descripcion_file, productos_por_mes):
 
     # Cargar el modelo entrenado
     with open(model_file, 'rb') as file:
@@ -373,10 +332,25 @@ def testing_meses(df, model_file, user_id_map_file, item_id_map_file, cliente_a_
     
     with open(cliente_a_nombre_file, 'rb') as file:
         cliente_a_nombre = pickle.load(file)
-    with open(item_index_to_codigosap_file, 'rb') as file:
-        item_index_to_codigosap = pickle.load(file)
+    
     with open(codigo_a_descripcion_file, 'rb') as file:
         codigo_a_descripcion = pickle.load(file)
+
+    # Cargar el mapeo de índice de ítem a (codigosap, mes)
+    with open(item_index_to_codigosap_mes_file, 'rb') as file:
+        item_index_to_codigosap_mes = pickle.load(file)
+
+    print("Tipo de productos_por_mes:", type(productos_por_mes))
+    print("Ejemplo de productos_por_mes:", productos_por_mes.head())
+    print("mes_input:", mes_input)
+
+    
+    # Filtrar los productos populares para el mes dado
+    productos_populares_mes_actual = productos_por_mes[productos_por_mes['mes'] == mes_input]
+
+
+    # Obtener solo los codigosap de los productos populares en ese mes
+    codigosap_populares_mes = set(productos_populares_mes_actual['codigosap'])
 
     df['user_index'] = df['CodCliente'].map(user_id_map)
     df['item_index'] = df['codigosap'].map(item_id_map)
@@ -400,25 +374,25 @@ def testing_meses(df, model_file, user_id_map_file, item_id_map_file, cliente_a_
     user_id_prueba_list = df['CodCliente'].drop_duplicates().sample(2)
 
 
+    # Procesar recomendaciones como antes
     if user_id_prueba in user_id_map:
         user_index = user_id_map[user_id_prueba]
         recommended = loaded_model.recommend(user_index, user_item_matrix_csr[user_index], N=10)
         
         indices_recomendados, puntuaciones = recommended
-        print(f"Recomendaciones para el usuario {user_id_prueba} ({cliente_a_nombre.get(user_id_prueba, 'Nombre no disponible')}):")
+        print(f"Recomendaciones para el usuario {user_id_prueba} en el mes {mes_input}:")
         
         for item_idx, score in zip(indices_recomendados, puntuaciones):
-            if item_idx in item_index_to_codigosap:
-                codigosap = item_index_to_codigosap[item_idx]
-                descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
-                
-                # Obtener los meses recomendados para cada producto
-                meses_recomendados = productos_por_mes[productos_por_mes['codigosap'] == codigosap]['mes'].tolist()
-                meses_recomendados_str = ', '.join(map(str, meses_recomendados))
-                
-                print(f"Producto Recomendado: ID {codigosap}, Score: {score}, Descripción: {descripcion}, Meses Recomendados: {meses_recomendados_str}")
+            if item_idx in item_index_to_codigosap_mes:
+                codigosap, mes_recomendado = item_index_to_codigosap_mes[item_idx]
+                if codigosap in codigosap_populares_mes:
+                    descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
+                    print(f"Producto Recomendado para Mes {mes_input}: ID {codigosap}, Score: {score}, Descripción: {descripcion}")
+                else:
+                    print(f"Producto ID {codigosap} no es popular en el mes {mes_input}.")
             else:
                 print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.")
+
     else:
         print(f"user_id {user_id_prueba} no encontrado en user_id_map.")
 
@@ -445,7 +419,7 @@ testing(df, modelo,user_id_map,item_id_map,cliente_a_nombre,item_index_to_codigo
 
 df2, user_id_map2, item_id_map2, cliente_a_nombre2, item_index_to_codigosap2, codigo_a_descripcion2, productos_populares_por_mes = preprocesamiento_por_meses()
 
-#entrenamiento2(df2,user_id_map2,item_id_map2)
+entrenamiento2(df2,user_id_map2,item_id_map2,productos_populares_por_mes)
 
 modelo2 = ruta_actual + "/ultimos_resultados/als_model_mejorado_mes.pkl"
 cliente_a_nombre2 = ruta_actual + "/ultimos_resultados/cliente_a_nombre_mes.pkl"
@@ -453,12 +427,9 @@ codigo_a_descripcion2 = ruta_actual + "/ultimos_resultados/codigo_a_descripcion_
 item_id_map2 = ruta_actual + "/ultimos_resultados/item_id_map_mes.pkl"
 item_index_to_codigosap2 = ruta_actual + "/ultimos_resultados/item_index_to_codigosap_mes.pkl"
 user_id_map2 = ruta_actual + "/ultimos_resultados/user_id_map_mes.pkl"
+productos_populares_por_mes2 = ruta_actual + "/ultimos_resultados/item_index_to_codigosap_mes.pkl"
 
-
-testing_meses(df2, modelo2,user_id_map2,item_id_map2,cliente_a_nombre2,item_index_to_codigosap2,codigo_a_descripcion2,productos_populares_por_mes)
-
-
-
+testing_meses("Noviembre","3518866",df2, modelo2,user_id_map2,item_id_map2,cliente_a_nombre2,item_index_to_codigosap2,codigo_a_descripcion2,productos_populares_por_mes)
 
 
 
