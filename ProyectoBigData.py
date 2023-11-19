@@ -317,6 +317,11 @@ def entrenamiento2(df_clientes_activos_y_productos_populares, user_id_map, item_
     with open('ultimos_resultados/codigo_a_descripcion_mes.pkl', 'wb') as file:
         pickle.dump(codigo_a_descripcion2, file)
 
+    # Guardar codigo_a_descripcion
+    with open('ultimos_resultados/productos_populares_por_mes.pkl', 'wb') as file:
+        pickle.dump(productos_populares_por_mes, file)
+
+
 
 def convertir_mes_a_numero(mes_nombre):
     meses = {
@@ -392,24 +397,34 @@ def testing_meses(mes_input, user_id_prueba, df, model_file, user_id_map_file, i
     if user_id_prueba in user_id_map:
         user_index = user_id_map[user_id_prueba]
 
-        indices_productos_populares = [item_id_map[codigosap] for codigosap in codigosap_populares_mes if codigosap in item_id_map]
-        user_item_matrix_filtrada = user_item_matrix_csr[user_index, indices_productos_populares]
+        # Añadir lógica para manejar productos no populares
+        recomendaciones_totales = 10
+        recomendaciones = []
 
-        recommended = loaded_model.recommend(user_index, user_item_matrix_filtrada, N=10)
-        
-        indices_recomendados, puntuaciones = recommended
-        print(f"Recomendaciones para el usuario {user_id_prueba} en el mes {mes_input}:")
-        
-        for item_idx, score in zip(indices_recomendados, puntuaciones):
-            if item_idx in item_index_to_codigosap_mes:
-                codigosap, mes_recomendado = item_index_to_codigosap_mes[item_idx]
-                if codigosap in codigosap_populares_mes:
-                    descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
-                    print(f"Producto Recomendado para Mes {mes_input}: ID {codigosap}, Score: {score}, Descripción: {descripcion}")
+        # Obtener e imprimir el nombre del usuario
+        nombre_usuario = cliente_a_nombre.get(user_id_prueba, "Nombre no disponible")
+        print(f"Nombre del usuario: {nombre_usuario}")
+
+        while len(recomendaciones) < recomendaciones_totales:
+            indices_productos_populares = [item_id_map[codigosap] for codigosap in codigosap_populares_mes if codigosap in item_id_map]
+            user_item_matrix_filtrada = user_item_matrix_csr[user_index, indices_productos_populares]
+
+            recommended = loaded_model.recommend(user_index, user_item_matrix_filtrada, N=recomendaciones_totales)
+            indices_recomendados, puntuaciones = recommended
+
+            for item_idx, score in zip(indices_recomendados, puntuaciones):
+                if item_idx in item_index_to_codigosap_mes:
+                    codigosap, mes_recomendado = item_index_to_codigosap_mes[item_idx]
+                    if codigosap in codigosap_populares_mes:
+                        descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
+                        recomendaciones.append((codigosap, score, descripcion))
+                        if len(recomendaciones) == recomendaciones_totales:
+                            break
                 else:
-                    print(f"Producto ID {codigosap} no es popular en el mes {mes_input}.")
-            else:
-                print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.")
+                    print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.")
+
+        for codigosap, score, descripcion in recomendaciones:
+            print(f"Producto Recomendado para Mes {mes_input}: ID {codigosap}, Score: {score}, Descripción: {descripcion}")
 
     else:
         print(f"user_id {user_id_prueba} no encontrado en user_id_map.")
@@ -437,7 +452,9 @@ testing(df, modelo,user_id_map,item_id_map,cliente_a_nombre,item_index_to_codigo
 
 df2, user_id_map2, item_id_map2, cliente_a_nombre2, item_index_to_codigosap2, codigo_a_descripcion2, productos_populares_por_mes = preprocesamiento_por_meses()
 
-entrenamiento2(df2,user_id_map2,item_id_map2,productos_populares_por_mes)
+productos_populares_por_mes_sin_modificar = productos_populares_por_mes
+
+#entrenamiento2(df2,user_id_map2,item_id_map2,productos_populares_por_mes)
 
 modelo2 = ruta_actual + "/ultimos_resultados/als_model_mejorado_mes.pkl"
 cliente_a_nombre2 = ruta_actual + "/ultimos_resultados/cliente_a_nombre_mes.pkl"
@@ -445,9 +462,9 @@ codigo_a_descripcion2 = ruta_actual + "/ultimos_resultados/codigo_a_descripcion_
 item_id_map2 = ruta_actual + "/ultimos_resultados/item_id_map_mes.pkl"
 item_index_to_codigosap2 = ruta_actual + "/ultimos_resultados/item_index_to_codigosap_mes.pkl"
 user_id_map2 = ruta_actual + "/ultimos_resultados/user_id_map_mes.pkl"
-productos_populares_por_mes2 = ruta_actual + "/ultimos_resultados/item_index_to_codigosap_mes.pkl"
+productos_populares_por_mes2 = ruta_actual + "/ultimos_resultados/productos_populares_por_mes.pkl"
 
-testing_meses("Noviembre","3518866",df2, modelo2,user_id_map2,item_id_map2,cliente_a_nombre2,item_index_to_codigosap2,codigo_a_descripcion2,productos_populares_por_mes)
+testing_meses("Febrero","3518866",df2, modelo2,user_id_map2,item_id_map2,cliente_a_nombre2,item_index_to_codigosap2,codigo_a_descripcion2,productos_populares_por_mes_sin_modificar)
 
 
 
