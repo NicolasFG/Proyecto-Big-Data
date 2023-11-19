@@ -1,7 +1,3 @@
-from surprise import KNNWithMeans
-from surprise import Dataset
-from surprise import Reader
-from surprise import accuracy
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
@@ -48,14 +44,10 @@ def preprocesamiento():
     # Crear un mapeo de CodCliente a NombreCliente
     cliente_a_nombre = df_clientes_activos_y_productos_populares.set_index('CodCliente')['NombreCliente'].drop_duplicates().to_dict()
     
-    
     print(df_clientes_activos_y_productos_populares)
 
     # Crear un mapeo de codigosap a descripcion
     codigo_a_descripcion = df_clientes_activos_y_productos_populares.set_index('codigosap')['Subcategoria'].to_dict()
-
-   
-
 
     # Crear mapeos de IDs a índices
     user_id_map = {user_id: index for index, user_id in enumerate(df_clientes_activos_y_productos_populares['CodCliente'].unique())}
@@ -74,7 +66,6 @@ def preprocesamiento():
     if len(set(item_id_map.values())) != len(item_id_map.values()):
         print("Hay índices duplicados en item_id_map.")
 
-
     # Crear un mapeo de item a codigo sap
     item_index_to_codigosap = {index: codigosap for codigosap, index in item_id_map.items()}
 
@@ -86,12 +77,13 @@ def preprocesamiento():
 
 def entrenamiento(df_clientes_activos_y_productos_populares, user_id_map, item_id_map):
     # Número total de usuarios e ítems
-    n_users = len(user_id_map)
-    n_items = len(item_id_map)
 
     # Convertir los IDs a índices
     df_clientes_activos_y_productos_populares['user_index'] = df_clientes_activos_y_productos_populares['CodCliente'].map(user_id_map)
     df_clientes_activos_y_productos_populares['item_index'] = df_clientes_activos_y_productos_populares['codigosap'].map(item_id_map)
+
+    n_users = len(user_id_map)
+    n_items = len(item_id_map)
 
     # Crear la matriz de interacciones usuario-item como COO
     user_item_matrix = coo_matrix(
@@ -105,7 +97,7 @@ def entrenamiento(df_clientes_activos_y_productos_populares, user_id_map, item_i
 
     # Entrenar el modelo ALS
     model = AlternatingLeastSquares(factors=100, use_gpu=False)
-    model.fit(user_item_matrix_csr.T * 70)  # Multiplicar por un factor de confianza si es necesario
+    model.fit(user_item_matrix_csr * 70)  # Multiplicar por un factor de confianza si es necesario
 
     # Guardar el modelo entrenado
     with open('ultimos_resultados/als_model_mejorado.pkl', 'wb') as file:
@@ -176,7 +168,6 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
     with open(codigo_a_descripcion_file, 'rb') as file:
         codigo_a_descripcion = pickle.load(file)
 
-    # Convertir los IDs a índices para el conjunto de prueba
     df['user_index'] = df['CodCliente'].map(user_id_map)
     df['item_index'] = df['codigosap'].map(item_id_map)
         
@@ -193,7 +184,7 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
     user_item_matrix_csr = user_item_matrix.tocsr()
 
     # Asumiendo que tienes un user_id específico para probar
-    user_id_prueba = 647917
+    user_id_prueba = 3518866
 
     #Genero una lista de 10 ids de usuarios de prueba.
     user_id_prueba_list = df['CodCliente'].drop_duplicates().sample(2)
@@ -205,17 +196,17 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
 
         indices_recomendados, puntuaciones = recommended
         print(f"Recomendaciones para el usuario {user_id_prueba} ({cliente_a_nombre.get(user_id_prueba, 'Nombre no disponible')}):")
-        
         for item_idx, score in zip(indices_recomendados, puntuaciones):
             if item_idx in item_index_to_codigosap:
                 codigosap = item_index_to_codigosap[item_idx]
                 descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
                 print(f"Producto Recomendado: ID {codigosap}, Score: {score}, Descripción: {descripcion}")
             else:
-                print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.")
+                print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.") 
     else:
         print(f"user_id {user_id_prueba} no encontrado en user_id_map.")
-    """
+        
+"""
     for user_id_prueba in user_id_prueba_list:
         if user_id_prueba in user_id_map:
             user_index = user_id_map[user_id_prueba]
@@ -237,7 +228,7 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
 
 df, user_id_map, item_id_map, cliente_a_nombre, item_index_to_codigosap, codigo_a_descripcion = preprocesamiento()
 
-#entrenamiento(df,user_id_map,item_id_map)
+""" entrenamiento(df,user_id_map,item_id_map) """
 
 ruta_actual = os.getcwd()
 
@@ -251,7 +242,7 @@ user_id_map = ruta_actual + "/ultimos_resultados/user_id_map.pkl"
 #validation(df)
 
 
-#testing(df, modelo,user_id_map,item_id_map,cliente_a_nombre,item_index_to_codigosap,codigo_a_descripcion)
+testing(df, modelo,user_id_map,item_id_map,cliente_a_nombre,item_index_to_codigosap,codigo_a_descripcion)
 
 
 #Se toma en cuenta los meses para recomendar un producto
@@ -288,9 +279,6 @@ def preprocesamiento_por_meses():
     df_clientes_activos_y_productos_populares['Mes'] = df_clientes_activos_y_productos_populares['fecha'].dt.month
     df_clientes_activos_y_productos_populares['Ano'] = df_clientes_activos_y_productos_populares['fecha'].dt.year
 
-    print(df_clientes_activos_y_productos_populares)
-
-
     # Ahora, agrupamos por cliente, código de producto, mes y año para calcular el rating_implicito
     df_clientes_activos_y_productos_populares['rating_implicito'] = df_clientes_activos_y_productos_populares.groupby(['CodCliente', 'codigosap', 'Mes', 'Ano'])['Cantidad'].transform('sum')
 
@@ -298,9 +286,6 @@ def preprocesamiento_por_meses():
     # Crear un mapeo de CodCliente a NombreCliente
     cliente_a_nombre = df_clientes_activos_y_productos_populares.set_index('CodCliente')['NombreCliente'].drop_duplicates().to_dict()
     
-    
-    print(df_clientes_activos_y_productos_populares)
-
     # Crear un mapeo de codigosap a descripcion
     codigo_a_descripcion = df_clientes_activos_y_productos_populares.set_index('codigosap')['Subcategoria'].to_dict()
 
