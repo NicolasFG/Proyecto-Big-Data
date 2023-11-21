@@ -39,12 +39,13 @@ def preprocesamiento():
     conteo_subcategoria = df_clientes_activos_y_productos_populares.groupby(['CodCliente', 'Subcategoria']).size().reset_index(name='Conteo')
     conteo_maximo = conteo_subcategoria.groupby('CodCliente')['Conteo'].transform('max')
     conteo_subcategoria['PreferenciaSubcategoria'] = conteo_subcategoria['Conteo'] / conteo_maximo
+    print(conteo_subcategoria)
 
     # Unir con el DataFrame principal
     df_clientes_activos_y_productos_populares = pd.merge(df_clientes_activos_y_productos_populares, conteo_subcategoria[['CodCliente', 'Subcategoria', 'PreferenciaSubcategoria']], on=['CodCliente', 'Subcategoria'], how='left')
+    print(df_clientes_activos_y_productos_populares)
 
-    # Asumiendo que tienes una columna 'PrecioUnitario' en tu DataFrame
-    # Normaliza 'PrecioUnitario' (puedes ajustar este paso según tus datos)
+    # Normaliza 'PrecioUnitario'
     df_clientes_activos_y_productos_populares['PrecioUnitarioNormalized'] = (df_clientes_activos_y_productos_populares['PrecioUnitario'] - df_clientes_activos_y_productos_populares['PrecioUnitario'].min()) / (df_clientes_activos_y_productos_populares['PrecioUnitario'].max() - df_clientes_activos_y_productos_populares['PrecioUnitario'].min())
 
     # Calcular un rating ponderado
@@ -164,10 +165,46 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
 
     user_item_matrix_csr = user_item_matrix.tocsr()
 
-    # Asumiendo que tienes un user_id específico para probar
+    random_clients = df['CodCliente'].drop_duplicates().sample(10)
+
+    for user_id_prueba in random_clients:
+        print(f"\n---- Procesando Usuario ID: {user_id_prueba} ----")
+
+        if user_id_prueba in user_id_map:
+            user_index = user_id_map[user_id_prueba]
+            recommended = loaded_model.recommend(user_index, user_item_matrix_csr[user_index], N=10)
+
+            indices_recomendados, puntuaciones = recommended
+            print(f"Recomendaciones para el usuario {user_id_prueba} ({cliente_a_nombre.get(user_id_prueba, 'Nombre no disponible')}):")
+            for item_idx, score in zip(indices_recomendados, puntuaciones):
+                if item_idx in item_index_to_codigosap:
+                    codigosap = item_index_to_codigosap[item_idx]
+                    descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
+                    print(f"Producto Recomendado: ID {codigosap}, Score: {score}, Descripción: {descripcion}")
+                else:
+                    print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.")
+        else:
+            print(f"user_id {user_id_prueba} no encontrado en user_id_map.")
+
+        print(f"\nTop 10 productos más comprados por el usuario {user_id_prueba}:")
+        user_purchases = df[df['CodCliente'] == user_id_prueba]
+        product_totals = user_purchases.groupby('codigosap')['Cantidad'].sum().sort_values(ascending=False)
+        top_products = product_totals.head(10)
+        for codigosap, total_quantity in top_products.items():
+            descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
+            print(f"Producto: ID {codigosap}, Cantidad Total Comprada: {total_quantity}, Descripción: {descripcion}")
+
+        print(f"\nTop 10 productos con el mayor rating implícito comprados por el usuario {user_id_prueba}:")
+        product_ratings = user_purchases.groupby('codigosap')['rating_implicito'].sum().sort_values(ascending=False)
+        top_10_products = product_ratings.head(10)
+        for codigosap, total_rating in top_10_products.items():
+            descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
+            print(f"Producto: ID {codigosap}, Rating Implícito Total: {total_rating}, Descripción: {descripcion}")
+
+
+    """     
     user_id_prueba = 3518866
 
-    #Genero una lista de 10 ids de usuarios de prueba.
     user_id_prueba_list = df['CodCliente'].drop_duplicates().sample(2)
 
 
@@ -186,7 +223,31 @@ def testing(df, model_file, user_id_map_file, item_id_map_file, cliente_a_nombre
                 print(f"Índice de ítem {item_idx} no encontrado en item_index_to_codigosap.") 
     else:
         print(f"user_id {user_id_prueba} no encontrado en user_id_map.")
-        
+
+
+    print(f"\nTop 10 productos más comprados por el usuario {user_id_prueba}:")
+    user_purchases = df[df['CodCliente'] == user_id_prueba]
+
+    product_totals = user_purchases.groupby('codigosap')['Cantidad'].sum().sort_values(ascending=False)
+
+    top_products = product_totals.head(10)
+
+    for codigosap, total_quantity in top_products.items():
+        descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
+        print(f"Producto: ID {codigosap}, Cantidad Total Comprada: {total_quantity}, Descripción: {descripcion}") 
+
+
+    print(f"\nTop 10 productos con el mayor rating implícito comprados por el usuario {user_id_prueba}:")
+    user_purchases = df[df['CodCliente'] == user_id_prueba]
+
+    product_ratings = user_purchases.groupby('codigosap')['rating_implicito'].sum().sort_values(ascending=False)
+
+    top_10_products = product_ratings.head(10)
+
+    for codigosap, total_rating in top_10_products.items():
+        descripcion = codigo_a_descripcion.get(codigosap, "Descripción no disponible")
+        print(f"Producto: ID {codigosap}, Rating Implícito Total: {total_rating}, Descripción: {descripcion}") 
+    """
 
 
 #Segundo: Preprocesamiento y entrenamiento de la data para recomendacion de los productos en sus meses respectivos
@@ -405,6 +466,8 @@ def testing_meses(mes_input, user_id_prueba, df, model_file, user_id_map_file, i
         nombre_usuario = cliente_a_nombre.get(user_id_prueba, "Nombre no disponible")
         print(f"Nombre del usuario: {nombre_usuario}")
 
+
+
         while len(recomendaciones) < recomendaciones_totales:
             indices_productos_populares = [item_id_map[codigosap] for codigosap in codigosap_populares_mes if codigosap in item_id_map]
             user_item_matrix_filtrada = user_item_matrix_csr[user_index, indices_productos_populares]
@@ -432,7 +495,7 @@ def testing_meses(mes_input, user_id_prueba, df, model_file, user_id_map_file, i
 
 ruta_actual = os.getcwd()
 
-"""
+
 #Recomendacion general
 df, user_id_map, item_id_map, cliente_a_nombre, item_index_to_codigosap, codigo_a_descripcion = preprocesamiento()
 
@@ -447,8 +510,8 @@ user_id_map = ruta_actual + "/ultimos_resultados/user_id_map.pkl"
 
 
 testing(df, modelo,user_id_map,item_id_map,cliente_a_nombre,item_index_to_codigosap,codigo_a_descripcion)
-"""
-#Recomendacion por meses
+
+""" #Recomendacion por meses
 
 df2, user_id_map2, item_id_map2, cliente_a_nombre2, item_index_to_codigosap2, codigo_a_descripcion2, productos_populares_por_mes = preprocesamiento_por_meses()
 
@@ -464,115 +527,4 @@ item_index_to_codigosap2 = ruta_actual + "/ultimos_resultados/item_index_to_codi
 user_id_map2 = ruta_actual + "/ultimos_resultados/user_id_map_mes.pkl"
 productos_populares_por_mes2 = ruta_actual + "/ultimos_resultados/productos_populares_por_mes.pkl"
 
-testing_meses("Febrero","3518866",df2, modelo2,user_id_map2,item_id_map2,cliente_a_nombre2,item_index_to_codigosap2,codigo_a_descripcion2,productos_populares_por_mes_sin_modificar)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-
-# Testing 
-
-
-# Dividir los datos
-df_train, df_test = train_test_split(df_clientes_activos_y_productos_populares, test_size=0.2, random_state=42)
-
-# Crear mapeos de IDs a índices para el conjunto de entrenamiento
-user_id_map_train = {user_id: index for index, user_id in enumerate(df_train['CodCliente'].unique())}
-item_id_map_train = {item_id: index for index, item_id in enumerate(df_train['codigosap'].unique())}
-
-# Convertir IDs a índices para el conjunto de entrenamiento
-df_train['user_index'] = df_train['CodCliente'].map(user_id_map_train)
-df_train['item_index'] = df_train['codigosap'].map(item_id_map_train)
-
-# Número total de usuarios e ítems
-n_users_train = len(user_id_map_train)
-n_items_train = len(item_id_map_train)
-
-
-
-# Crear la matriz de interacciones usuario-item como COO
-user_item_matrix_test = coo_matrix(
-    (df_train['rating_implicito'], 
-     (df_train['user_index'], df_train['item_index'])),
-    shape=(n_users_train, n_items_train)
-)
-
-
-user_item_matrix_train_csr = user_item_matrix_test.tocsr()
-
-model.fit(user_item_matrix_train_csr.T * 40)
-
-
-
-
-predictions = model.predict(user_item_matrix_test)
-
-# Evaluar el rendimiento
-precision = accuracy.precision(predictions)
-recall = accuracy.recall(predictions)
-f1_score = 2 * (precision * recall) / (precision + recall)
-
-print("Precision:", precision)
-print("Recall:", recall)
-print("F1 Score:", f1_score)
-
-"""
-
-
-
-"""         
-matriz_usuario_producto = df_clientes_activos_y_productos_populares.pivot_table(
-    index='CodCliente', 
-    columns='codigosap', 
-    values='algún_valor_de_interacción', 
-    fill_value=0
-)
-"""
-
-
-
-
-
-
-"""
-
-# Convertir la columna 'fecha' a formato de fecha
-df['fecha'] = pd.to_datetime(df['fecha'])
-
-# Extraer el año y crear una nueva columna
-df['Año'] = df['fecha'].dt.year
-
-# Agrupar por año
-interacciones_por_año = df.groupby('Año')
-
-# Calcular el total de interacciones por año
-total_interacciones_por_año = interacciones_por_año.size()
-
-# Calcular el número de clientes únicos por año
-clientes_unicos_por_año = interacciones_por_año['CodCliente'].nunique()
-
-# Calcular el promedio de interacciones por año
-promedio_interacciones_por_año = total_interacciones_por_año / clientes_unicos_por_año
-
-# Imprimir el promedio de interacciones por año
-print("Promedio de interacciones por año:")
-print(promedio_interacciones_por_año)
-"""
-
+testing_meses("Febrero","3518866",df2, modelo2,user_id_map2,item_id_map2,cliente_a_nombre2,item_index_to_codigosap2,codigo_a_descripcion2,productos_populares_por_mes_sin_modificar) """
