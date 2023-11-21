@@ -3,4 +3,5 @@
 - clean.py
 - ProyectoBigData.py
 
-correr en ese orden. Descomentar training en Proyecto big data la primera vez que se corra.
+Correr en ese orden. Descomentar training en ProyectoBigData.py la primera vez que se corra.
+Agregar supermercados.csv en un directorio llamados recos_supermercados
